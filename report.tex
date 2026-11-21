@@ -1,0 +1,578 @@
+\documentclass[11pt,a4paper]{article}
+
+% ---------- packages (all standard in a normal TeX Live / MiKTeX setup) ----------
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}              % Times New Roman look
+\usepackage[margin=2cm]{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb}
+\usepackage{verbatim}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parskip}{4pt}
+\emergencystretch=1.5em
+\renewcommand{\arraystretch}{1.12}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\begin{document}
+
+% =====================================================================
+% Rubric sheet (serves as the title page, as required by the handout)
+% =====================================================================
+\noindent
+{\Large\bfseries DEPARTMENT OF COMPUTER AND INFORMATION SYSTEMS ENGINEERING}\\[2mm]
+{\large BACHELORS IN COMPUTER SYSTEMS ENGINEERING}\\[1mm]
+{\large Course Code and Title: CS-323 Artificial Intelligence}\\[1mm]
+{\large Complex Engineering Problem --- Term Project}\\[1mm]
+{\small TE Batch 2024, Fall Semester 2026 \quad Instructors: Dr.\ Maria Waqas, Dr.\ Sumayya Zafar}
+
+\vspace{4mm}
+\noindent
+\setlength{\tabcolsep}{1.5pt}
+\begin{tabular}{|p{1.2cm}|p{2.2cm}|p{1.4cm}|p{2.2cm}|p{1.4cm}|p{2.2cm}|p{1.4cm}|p{2.2cm}|p{1.4cm}|}
+\hline
+\bfseries Group & \multicolumn{2}{c|}{\bfseries S1}
+                & \multicolumn{2}{c|}{\bfseries S2}
+                & \multicolumn{2}{c|}{\bfseries S3}
+                & \multicolumn{2}{c|}{\bfseries S4} \\
+\cline{2-9}
+                & \bfseries Name & \bfseries Roll
+                & \bfseries Name & \bfseries Roll
+                & \bfseries Name & \bfseries Roll
+                & \bfseries Name & \bfseries Roll \\
+\cline{2-9}
+\footnotesize Members & Ukasha & CS-24115
+        & Abdul Mueed & CS-24117
+        & Abdullah Baig & CS-24123
+        & Umer Iqbal & CS-24127 \\
+\hline
+\end{tabular}
+
+\vspace{4mm}
+\noindent{\bfseries Grading Rubric}\\[1mm]
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{longtable}{|p{3.3cm}|p{2.0cm}|p{2.0cm}|p{2.0cm}|p{2.0cm}|p{0.8cm}|p{0.8cm}|p{0.8cm}|p{0.8cm}|}
+\hline
+\bfseries Criterion and scale & \bfseries 1 & \bfseries 2 & \bfseries 3 & \bfseries 4
+& \bfseries S1 & \bfseries S2 & \bfseries S3 & \bfseries S4 \\
+\hline
+\endhead
+C1. Graph search (4 marks) &
+Incorrect; wrong output or fails on boards &
+Partial; limited or inconsistent results &
+Correct; mostly correct outputs &
+Correct and efficient &
+& & & \\ \hline
+C2. CSP formulation (4 marks) &
+Incorrect model or solver &
+Partly correct; limited or inaccurate output &
+Correct model; mostly accurate results &
+Accurate and efficient solver &
+& & & \\ \hline
+C3. Integration (2 marks) &
+Not integrated; robot fails task &
+Partial; misses visits or return &
+Executes most valid cases &
+Complete journey; all cleaned; returns &
+& & & \\ \hline
+C4. Comparison and analysis (2 marks) &
+No meaningful comparison &
+Basic comparison; little depth &
+Clear metrics and interpretation &
+Comprehensive quantitative/qualitative analysis &
+& & & \\ \hline
+C5. Report format (4 marks) &
+Missing information; poorly formatted &
+Partial information; well formatted &
+All information; poorly formatted &
+All information; correct format &
+& & & \\ \hline
+C6. Team contribution (4 marks) &
+No meaningful contribution &
+Partial contribution; limited collaboration &
+Adequate contribution; met goals &
+Active, significant contribution beyond goals &
+& & & \\ \hline
+\bfseries Final score & \multicolumn{8}{c|}{
+\hspace{1cm} Teacher's signature: \underline{\hspace{5cm}} } \\
+\hline
+\end{longtable}
+\normalsize
+
+\newpage
+
+% =====================================================================
+\section{Problem Definition and Representation}
+
+The robot works on a grid of square cells. It starts at a charging station, must visit every
+dirty cell exactly once as decided by a scheduler, and must finally return to the station.
+Four-direction movement only (up, down, left, right); diagonal moves are not allowed.
+Obstacle cells cannot be entered. Every movement costs one unit, so the navigation cost of a
+journey is simply the number of moves.
+
+The two artificial-intelligence components are:
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \textbf{Graph-based search}: find a valid shortest path from a given start cell to a
+        given goal cell while avoiding walls. We implement one uninformed method (BFS) and one
+        informed method (A*).
+  \item \textbf{Constraint Satisfaction Problem (CSP)}: assign each cleaning task to one time
+        slot so that all precedence, latest-slot and one-task-per-slot rules hold.
+\end{itemize}
+
+The CSP output fixes the \emph{order} of cleaning; the search component supplies the
+\emph{paths}. The two are then integrated into one simulation.
+
+\subsection{Problem formulation}
+
+\begin{center}
+\begin{tabular}{@{}p{3.4cm}p{12.3cm}@{}}
+\toprule
+Element & Representation \\
+\midrule
+Environment & Dictionary with \code{rows}, \code{cols}, \code{obstacles} (set of cells),
+              \code{dirties} (ordered list) and \code{station}, all read from \code{Environment.txt}. \\
+State & A cell $(r,c)$, with $0\le r<\text{rows}$ and $0\le c<\text{cols}$. \\
+Initial state & The cell passed to the search function (the charging station in the full run). \\
+Actions & UP $(-1,0)$, DOWN $(+1,0)$, LEFT $(0,-1)$, RIGHT $(0,+1)$. \\
+Transition model & New state $= (r+\Delta r,\; c+\Delta c)$; valid only inside the grid and not a wall. \\
+Goal test & \code{state == goal\_state}. \\
+Step cost & Every valid move costs 1; therefore path cost $=\;|\text{path}|-1$. \\
+CSP variables & One per dirty cell: $D1,D2,\dots,Dn$, in file order. \\
+CSP domains & Initially $\{1,2,\dots,n_{\text{slots}}\}$; reduced by latest-slot rules. \\
+CSP constraints & Precedence ($D_i$ before $D_j$), latest slot ($D_i\le T_k$),
+                  and all-different slot assignment. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Example environment (our \code{Environment.txt})}
+
+The 8$\times$8 grid has seven walls, four dirty cells and one charging station at $(0,0)$.
+Letters $D1\ldots D4$ are the dirty cells, $X$ is a wall, $C$ the station and ``.'' a free cell.
+
+\begin{center}
+\small
+\begin{tabular}{c|cccccccc}
+      & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\ \hline
+0 & C & . & . & . & . & . & . & . \\
+1 & . & . & X & . & . & . & . & D1 \\
+2 & . & . & X & . & . & . & . & . \\
+3 & . & . & X & . & . & . & . & . \\
+4 & . & . & X & . & . & X & . & D2 \\
+5 & . & . & X & . & . & X & . & . \\
+6 & D4& . & . & . & . & . & . & . \\
+7 & . & . & . & . & . & . & D3& . \\
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{Graph-Based Search Algorithms}
+
+\subsection{Breadth-First Search (uninformed)}
+
+BFS keeps a FIFO queue of cells to explore. It expands all cells at depth $d$ before any cell
+at depth $d+1$. Because every step has cost 1, the first time a cell is generated it is reached
+by a shortest path; a parent map records that path. BFS is complete on a finite grid and
+optimal for unit costs, but it may expand a large fraction of the grid before reaching the goal.
+
+\begin{verbatim}
+BFS(grid, start, goal):
+    queue <- [start];  parent[start] <- None;  expanded <- 0
+    while queue is not empty:
+        cell <- queue.pop_front();  expanded <- expanded + 1
+        if cell = goal: return build_path(parent, goal), cost, expanded
+        for each legal neighbour nxt of cell:
+            if nxt not in parent:
+                parent[nxt] <- cell
+                queue.push_back(nxt)
+    return FAIL, FAIL, expanded
+\end{verbatim}
+
+\subsection{A* Search (informed)}
+
+A* orders the frontier by $f(n)=g(n)+h(n)$, where $g(n)$ is the cost already paid to reach $n$
+and $h(n)$ is the Manhattan distance to the goal:
+\[
+h(n)=|r_n-r_{\text{goal}}|+|c_n-c_{\text{goal}}|.
+\]
+Manhattan distance is \emph{admissible} (it never overestimates the true remaining cost in a
+four-direction grid with unit steps) and \emph{consistent} (moving one step changes $h$ by at
+most 1, which is exactly the step cost). Therefore the first time A* pops a goal cell, that
+goal is optimal, and no already-expanded cell needs to be reopened. With a good estimate the
+search is strongly directed toward the target and expands far fewer cells than BFS.
+
+\begin{verbatim}
+A_STAR(grid, start, goal):
+    todo <- [(h(start), start)];  parent[start] <- None
+    cost[start] <- 0;  done <- {};  expanded <- 0
+    while todo is not empty:
+        sort todo by estimated cost;  (f, cell) <- todo.pop_front()
+        if cell in done: continue
+        done.add(cell);  expanded <- expanded + 1
+        if cell = goal: return build_path(parent, goal), cost, expanded
+        for each legal neighbour nxt of cell:
+            new_cost <- cost[cell] + 1
+            if nxt not in cost or new_cost < cost[nxt]:
+                cost[nxt] <- new_cost;  parent[nxt] <- cell
+                todo.push((new_cost + h(nxt), nxt))
+    return FAIL, FAIL, expanded
+\end{verbatim}
+
+(For these small grids we sort the frontier list explicitly; this is slower in theory than a
+binary heap but much easier to read, and the grids are at most a few hundred cells.)
+
+\subsection{Property comparison}
+
+\begin{center}
+\begin{tabular}{@{}p{3.0cm}p{5.8cm}p{5.8cm}@{}}
+\toprule
+Property & BFS & A* \\
+\midrule
+Type & Uninformed & Informed (uses Manhattan $h$) \\
+Frontier & FIFO queue & List sorted by $f=g+h$ \\
+Complete & Yes (finite grid) & Yes (finite grid) \\
+Optimal & Yes, unit step costs & Yes, admissible and consistent $h$ \\
+Typical expansions & High (layer by layer) & Low (goal-directed) \\
+Memory & $O(b^d)$ frontier & $O(b^d)$ frontier \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{CSP Formulation and Implementation}
+
+\subsection{Variables, domains and constraints}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item \textbf{Variables}: $D1,D2,\ldots,Dn$ --- one for each dirty location in
+        \code{Environment.txt}. A task that appears in no scheduling rule is still a variable.
+  \item \textbf{Domains}: integers $1\ldots N$ ($N$ = number of time slots); a latest rule
+        $D_i$ by $T_k$ trims the domain of $D_i$ to $\{1\ldots k\}$.
+  \item \textbf{Precedence}: rule $(D_i,D_j)$ means slot$(D_i) <$ slot$(D_j)$.
+  \item \textbf{Latest slot}: rule $(D_i,T_k)$ means slot$(D_i)\le k$.
+  \item \textbf{Slot exclusivity}: all assigned slots are distinct, so $N\ge n$ is required.
+\end{itemize}
+
+\subsection{Role of each required function}
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}p{4.6cm}p{11.1cm}@{}}
+\toprule
+Function & Role in the solver \\
+\midrule
+\code{select\_unassigned\_variable} & MRV: choose the unassigned variable with the smallest
+current domain. Ties are broken by the degree heuristic: the variable linked by precedence
+rules to the largest number of other unassigned variables wins; a final alphabetical tie-break
+keeps runs deterministic. \\
+\code{order\_domain\_values} & Least Constraining Value: count how many values of related
+unassigned variables would be removed (by slot exclusivity or by precedence) if this value
+were chosen, and try the least damaging value first. \\
+\code{is\_consistent} & Reject a value if the slot is already used, if it violates a latest-slot
+rule, or if it breaks a precedence rule whose partner is already assigned. \\
+\code{forward\_check} & Work on a fresh copy of the domains, remove the chosen slot from other
+variables, enforce precedence bounds on directly linked variables, and reject the branch if any
+domain becomes empty. Fresh copies give automatic restoration on backtracking. \\
+\code{backtracking\_search} & Recursive depth-first assignment using the four helpers above;
+returns a complete assignment or failure. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{verbatim}
+BACKTRACKING(variables, domains, rules):
+    assignment <- {}
+    return SOLVE(domains)
+
+SOLVE(domains):
+    if all variables assigned: return copy of assignment
+    var  <- SELECT_UNASSIGNED_VARIABLE(assignment, domains, rules)   % MRV + degree
+    vals <- ORDER_DOMAIN_VALUES(var, assignment, domains, rules)     % LCV
+    for value in vals:
+        if not IS_CONSISTENT(var, value, assignment, rules): continue
+        smaller <- FORWARD_CHECK(var, value, assignment, domains, rules)
+        if smaller = FAIL: continue
+        assignment[var] <- value
+        answer <- SOLVE(smaller)
+        if answer != FAIL: return answer
+        delete assignment[var]
+    return FAIL
+\end{verbatim}
+
+\subsection{Sample schedule produced}
+
+For our \code{Schedule.txt} ($D1\!\prec\!D2$, $D2\!\prec\!D3$, $D1\!\prec\!D4$;
+$D2\le T3$, $D3\le T4$) the solver returns:
+
+\begin{center}
+\begin{tabular}{c|cccc}
+Time slot & T1 & T2 & T3 & T4 \\ \hline
+Task      & D1 & D2 & D3 & D4 \\
+Dirty cell& (1,7) & (4,7) & (7,6) & (6,0) \\
+\end{tabular}
+\end{center}
+
+All four tasks are assigned once, all slots are distinct, and every precedence/latest rule is
+satisfied. Notice that the sample files yield a different valid order
+($D2,D1,D3,D4$); the solver is not hard-coded to one answer.
+
+% =====================================================================
+\section{System Integration}
+
+\code{execute\_schedule(grid, charging\_station, schedule, algorithm)} performs the full
+simulation:
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item Sort the CSP assignment by slot number to obtain the cleaning order.
+  \item Translate each task label into its dirty-cell coordinate using the environment file.
+  \item Starting at the charging station, call \code{search} for every consecutive stop.
+  \item Append each returned path while skipping its first cell (already present), so the
+        complete route has no duplicated joints.
+  \item Add the corresponding move cost of every leg.
+  \item After the last dirty cell, call \code{search} once more back to the charging station.
+  \item Verify that all dirty cells appear in the schedule and that the final cell is the station.
+        Return \code{complete\_path}, \code{total\_cost} and \code{success}.
+  \item If any leg returns failure, stop immediately and report failure rather than claiming
+        that cleaning succeeded.
+\end{enumerate}
+
+The components remain independent: the CSP solver never sees the grid, and the search
+functions never see the time slots. Integration only consumes their outputs.
+
+% =====================================================================
+\section{Results and Comparative Analysis}
+
+\subsection{Test 1 --- our own environment}
+
+\begin{center}
+\begin{tabular}{@{}p{3.2cm}rrrr@{}}
+\toprule
+Journey & BFS moves & BFS expanded & A* moves & A* expanded \\
+\midrule
+(0,0) $\to$ (1,7) & 8 & 38 & 8 & 15 \\
+(1,7) $\to$ (4,7) & 3 & 10 & 3 & 4 \\
+(4,7) $\to$ (7,6) & 4 & 18 & 4 & 7 \\
+(7,6) $\to$ (6,0) & 7 & 38 & 7 & 8 \\
+(6,0) $\to$ (0,0) & 6 & 24 & 6 & 7 \\
+\midrule
+\textbf{Total} & \textbf{28} & \textbf{128} & \textbf{28} & \textbf{41} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Complete A* route (29 cells, 28 moves):
+\begin{verbatim}
+(0,0) (0,1) (0,2) (0,3) (0,4) (0,5) (0,6) (0,7) (1,7)
+(2,7) (3,7) (4,7) (4,6) (5,6) (6,6) (7,6) (6,6) (6,5)
+(6,4) (6,3) (6,2) (6,1) (6,0) (5,0) (4,0) (3,0) (2,0)
+(1,0) (0,0)
+\end{verbatim}
+
+\subsection{Test 2 --- provided sample environment}
+
+\begin{center}
+\begin{tabular}{@{}p{3.2cm}rrrr@{}}
+\toprule
+Journey & BFS moves & BFS expanded & A* moves & A* expanded \\
+\midrule
+(0,0) $\to$ (3,7) & 10 & 48 & 10 & 29 \\
+(3,7) $\to$ (0,7) & 3 & 10 & 3 & 4 \\
+(0,7) $\to$ (7,7) & 7 & 27 & 7 & 8 \\
+(7,7) $\to$ (7,0) & 7 & 33 & 7 & 8 \\
+(7,0) $\to$ (0,0) & 7 & 26 & 7 & 8 \\
+\midrule
+\textbf{Total} & \textbf{34} & \textbf{144} & \textbf{34} & \textbf{57} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Complete A* route for the sample run (35 cells, 34 moves):
+\begin{verbatim}
+(0,0) (0,1) (0,2) (0,3) (0,4) (0,5) (0,6) (0,7) (1,7)
+(2,7) (3,7) (2,7) (1,7) (0,7) (1,7) (2,7) (3,7) (4,7)
+(5,7) (6,7) (7,7) (7,6) (7,5) (7,4) (7,3) (7,2) (7,1)
+(7,0) (6,0) (5,0) (4,0) (3,0) (2,0) (1,0) (0,0)
+\end{verbatim}
+
+\subsection{Interpretation}
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item On every leg both algorithms return the \emph{same optimal cost}; this is exactly what
+        theory predicts for unit step costs and an admissible, consistent heuristic.
+  \item A* expands roughly one third of the cells BFS expands (41 vs 128, and 57 vs 144 in the
+        two full journeys), because Manhattan distance guides it toward the target instead of
+        filling complete layers.
+  \item On very short or unobstructed legs the gap is small; it grows with the distance and
+        with obstacles that force detours.
+  \item The two total costs (28 and 34) differ because they belong to different environments
+        and different CSP-generated orders, not because one algorithm is ``better'' at finding
+        short routes. The comparison that matters is per-leg cost (equal) and expansions
+        (A* lower).
+\end{itemize}
+
+% =====================================================================
+\section{Testing and Validation}
+
+Three categories of test were run from the notebook (additional edge cases: start equals goal,
+unreachable target, hand-written rules containing \code{'T3'} strings, and coordinates wrapped
+over several lines).
+
+\subsection{Test 1 --- own environment and schedule}
+
+Configuration:
+\begin{verbatim}
+Environment.txt                                 Schedule.txt
+8,8                                             4
+7                                               3
+(1,2),(2,2),(3,2),(4,2),(5,2),(4,5),(5,5)       (D1,D2)
+4                                               (D2,D3)
+(1,7),(4,7),(7,6),(6,0)                         (D1,D4)
+(0,0)                                           2
+                                                (D2,T3)
+                                                (D3,T4)
+\end{verbatim}
+
+Observed output: schedule T1=D1, T2=D2, T3=D3, T4=D4; order
+$(1,7)\!\to\!(4,7)\!\to\!(7,6)\!\to\!(6,0)$; complete route as listed above;
+28 movements, total navigation cost 28; status SUCCESS --- all dirty cells cleaned and the
+robot returned to $(0,0)$. The notebook displays a coloured grid of the final state (all four
+dirty cells marked cleaned, robot at C).
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\small
+\textbf{Screenshot placeholder --- Test 1.} Paste here the notebook screenshot showing
+\code{Environment.txt}/\code{Schedule.txt} and the SUCCESS output with the coloured journey grid.
+}}
+\caption{Configuration and successful output for our environment (notebook output).}
+\end{figure}
+
+\subsection{Test 2 --- provided sample files}
+
+Configuration: \code{Environment\_Sample.txt} (8$\times$8, six walls in column 3,
+dirty cells $(0,7),(3,7),(7,7),(7,0)$, station $(0,0)$) and
+\code{Schedule\_Sample.txt} (four slots; $D1\!\prec\!D3$, $D2\!\prec\!D4$, $D1\!\prec\!D4$;
+$D3\le T3$, $D2\le T3$).
+
+Observed output: schedule T1=D2, T2=D1, T3=D3, T4=D4 (also valid); order
+$(3,7)\!\to\!(0,7)\!\to\!(7,7)\!\to\!(7,0)$; 34 movements, total cost 34; status SUCCESS.
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\small
+\textbf{Screenshot placeholder --- Test 2.} Paste here the notebook screenshot of the sample
+run with its comparison chart and final grid.
+}}
+\caption{Configuration and successful output for the provided sample (notebook output).}
+\end{figure}
+
+\subsection{Test 3 --- failure cases}
+
+\noindent\textbf{3a. Infeasible schedule} --- \code{Environment.txt} with
+\code{Schedule\_Error.txt}: three slots for four tasks, plus $D1\!\prec\!D2$, $D2\!\prec\!D3$,
+$D2\le T2$, $D3\le T2$. The precedence chain forces $D2\ge 2$ and $D3\ge 3$, which contradicts
+$D3\le 2$. The CSP correctly reports \emph{No feasible schedule exists}; no navigation is
+attempted.
+
+\noindent\textbf{3b. Unreachable destination} --- \code{Environment\_Error.txt} with
+\code{Schedule.txt}: dirty cell $D4=(6,1)$ is enclosed by walls at
+$(5,0),(5,1),(5,2),(6,0),(6,2),(7,0),(7,1),(7,2)$. The CSP still finds a schedule, but both
+BFS and A* return no path for $(7,7)\to(6,1)$ after expanding 55 cells. The simulation stops
+with a partial route of 14 moves and status \emph{FAIL --- a required path was not found};
+it does not falsely report success.
+
+Final grid of the failure run ($R$ = robot stuck at $(7,7)$, $*$ = cleaned, $X$ = wall):
+\begin{center}
+\small
+\begin{tabular}{c|cccccccc}
+      & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 \\ \hline
+0 & C & . & . & . & . & . & . & * \\
+1 & . & . & . & . & . & . & . & . \\
+2 & . & . & . & . & . & . & . & . \\
+3 & . & . & . & . & . & . & . & * \\
+4 & . & . & . & . & . & . & . & . \\
+5 & X & X & X & . & . & . & . & . \\
+6 & X & * & X & . & . & . & . & . \\
+7 & X & X & X & . & . & . & . & R \\
+\end{tabular}
+\end{center}
+
+\begin{figure}[H]
+\centering
+\fbox{\parbox{0.92\textwidth}{\small
+\textbf{Screenshot placeholder --- Test 3.} Paste here notebook screenshots showing the
+infeasible-schedule message and the unreachable-destination FAIL status with its grid.
+}}
+\caption{Detection and reporting of both failure cases.}
+\end{figure}
+
+\subsection{Test 4 --- infeasible input}
+
+The input files and query points are checked before a run starts, and an infeasible case is
+reported on the console instead of crashing or producing a false success:
+
+\begin{itemize}[leftmargin=1.2cm]
+  \item A bad environment or schedule file (missing, short, with extra numbers, an invalid grid
+        size, overlapping or out-of-grid cells, an unknown task, etc.) prints
+        \code{INPUT ERROR: <reason>} and the run stops.
+  \item A schedule with too few slots, an impossible deadline or contradictory rules prints
+        \code{NO FEASIBLE SCHEDULE} (as in Test 3a above).
+  \item A walled-in target, a start/goal on a wall or outside the grid, or an unknown algorithm
+        prints \code{no path} / \code{FAILED}, and the robot stops at the last reachable cell
+        (as in Test 3b above).
+\end{itemize}
+
+The algorithms themselves (BFS, A*, MRV/LCV/forward checking and backtracking) are unchanged;
+these are simple checks at the file-reading and \code{search} entry points. Normal edge cases
+remain normal: \code{start = goal} returns \code{([start], 0, 0)}, an empty route has cost
+\code{None}, two deadlines keep the stricter one, and unused slots stay empty.
+
+% =====================================================================
+\section{Discussion and Improvements}
+
+\paragraph{Correctness.} Both searches return legal, adjacent, wall-free paths; the cost equals
+path length minus one. Start equals goal is handled without expanding a node. When no route
+exists, the algorithms return failure and the integration reports failure. The CSP assigns
+every task exactly once and enforces all three constraint families.
+
+\paragraph{Completeness and optimality.} BFS is complete and optimal for unit step costs on a
+finite grid. A* is complete here and optimal because Manhattan distance is admissible and
+consistent on a four-direction grid. Backtracking with MRV and forward checking is complete for
+the finite CSP: it explores all consistent assignments and returns a solution if one exists.
+
+\paragraph{Limitations.} Obstacles and tasks are static; step costs are all 1; battery level,
+recharging needs, turning cost and dynamic obstacles are not modelled. The CSP optimises only
+feasibility, not travel distance --- a feasible order may be longer than another feasible order.
+The A* frontier is a sorted list rather than a heap, which is fine for small grids but does not
+scale to very large maps.
+
+\paragraph{Possible improvements.} Use a binary heap or bidirectional A*; use branch-and-bound
+or a distance-aware objective so the CSP minimises total travel; add battery constraints and
+opportunity charging; animate the journey; add unit tests for parsers and failure handling.
+
+% =====================================================================
+\section{References}
+
+\begin{enumerate}[leftmargin=1.2cm]
+  \item Hand Outs of Dr. Maria Waqas for CSP and BFS algorithms
+  \item Python Software Foundation, \emph{Python 3 Documentation} --- \code{heapq},
+        \code{deque}, \code{re}, \code{IPython.display}.
+\end{enumerate}
+
+% =====================================================================
+\section{Generative AI Use Declaration}
+
+Generative AI (the OpenCode coding assistant) was used during this project to help debug the
+implementation, simplify the code for readability, generate the coloured notebook visuals, and
+draft parts of this report. The group members reviewed the code, checked every result against
+the handout requirements, and understand the algorithms and outputs. We take full
+responsibility for the submitted work.
+
+\end{document}
